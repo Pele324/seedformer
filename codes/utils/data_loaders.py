@@ -1,5 +1,6 @@
 
 import json
+import open3d
 import logging
 import numpy as np
 import random
@@ -11,15 +12,18 @@ from tqdm import tqdm
 from utils.io import IO
 import os
 
+# label_mapping = {
+#     3: '03001627',
+#     6: '04379243',
+#     5: '04256520',
+#     1: '02933112',
+#     4: '03636649',
+#     2: '02958343',
+#     0: '02691156',
+#     7: '04530566'
+# }
 label_mapping = {
-    3: '03001627',
-    6: '04379243',
-    5: '04256520',
-    1: '02933112',
-    4: '03636649',
-    2: '02958343',
-    0: '02691156',
-    7: '04530566'
+    0: '00000000'
 }
 
 
@@ -50,15 +54,18 @@ def collate_fn(batch):
     return taxonomy_ids, model_ids, data
 
 
+# code_mapping = {
+#     'plane': '02691156',
+#     'cabinet': '02933112',
+#     'car': '02958343',
+#     'chair': '03001627',
+#     'lamp': '03636649',
+#     'couch': '04256520',
+#     'table': '04379243',
+#     'watercraft': '04530566',
+# }
 code_mapping = {
-    'plane': '02691156',
-    'cabinet': '02933112',
-    'car': '02958343',
-    'chair': '03001627',
-    'lamp': '03636649',
-    'couch': '04256520',
-    'table': '04379243',
-    'watercraft': '04530566',
+    'tooth_with_bracket': '00000000'
 }
 
 
@@ -88,19 +95,53 @@ class Dataset(torch.utils.data.dataset.Dataset):
             rand_idx = random.randint(0, self.options['n_renderings'] -
                                       1) if self.options['shuffle'] else 0
 
-        # load required data
-        for ri in self.options['required_items']:
-            file_path = sample['%s_path' % ri]
-            if type(file_path) == list:
-                file_path = file_path[rand_idx]
-            # print(file_path)
-            data[ri] = IO.get(file_path).astype(np.float32)
+        # load required data for gtcloud and partial_cloud
+        # # gtcloud
+        file_path = sample['%s_path' % 'gtcloud']
+        if type(file_path) == list:
+            file_path = file_path[rand_idx]
+        data['gtcloud'] = IO.get(file_path).astype(np.float32)
+        data['gtcloud'], centroid, ratio = self.pc_norm(data['gtcloud'], None, None)
+        # # partial_cloud
+        file_path = sample['%s_path' % 'partial_cloud']
+        if type(file_path) == list:
+            file_path = file_path[rand_idx]
+        data['partial_cloud'] = IO.get(file_path).astype(np.float32)
+        data['partial_cloud'], centroid, ratio = self.pc_norm(data['partial_cloud'], centroid, ratio, is_gt=False)
+
+        ##################################################
+        gtcloud = open3d.geometry.PointCloud()
+        gtcloud.points = open3d.utility.Vector3dVector(data['gtcloud'])
+        gtcloud.paint_uniform_color([0,0,1])
+        partial_cloud = open3d.geometry.PointCloud()
+        partial_cloud.points = open3d.utility.Vector3dVector(data['partial_cloud'])
+        partial_cloud.paint_uniform_color([1,0,0])
+        ##################################################
 
         # apply transforms
         if self.transforms is not None:
             data = self.transforms(data)
 
-        return sample['taxonomy_id'], sample['model_id'], data
+        ##################################################
+        gtcloud_transformed = open3d.geometry.PointCloud()
+        gtcloud_transformed.points = open3d.utility.Vector3dVector(data['gtcloud'])
+        gtcloud_transformed.paint_uniform_color([1,1,0])
+        partial_cloud_transformed = open3d.geometry.PointCloud()
+        partial_cloud_transformed.points = open3d.utility.Vector3dVector(data['partial_cloud'])
+        partial_cloud_transformed.paint_uniform_color([0,1,0])
+        open3d.visualization.draw_geometries([gtcloud_transformed])
+        ##################################################
+
+        return sample['taxonomy_id'], sample['model_id'], data, centroid, ratio
+
+
+    def pc_norm(self, pc, c, m, is_gt=True):
+        """ pc: NxC, return NxC """
+        centroid = np.mean(pc, axis=0) if is_gt else c
+        pc = pc - centroid
+        ratio = np.max(np.sqrt(np.sum(pc**2, axis=1))) if is_gt else m
+        pc = pc / ratio
+        return pc, centroid, ratio
 
 
 class ShapeNetDataLoader(object):
@@ -129,29 +170,34 @@ class ShapeNetDataLoader(object):
 
     def _get_transforms(self, cfg, subset):
         if subset == DatasetSubset.TRAIN:
-            return utils.data_transforms.Compose([{
+            return utils.data_transforms.Compose([
+            {
                 'callback': 'UpSamplePoints',
                 'parameters': {
                     'n_points': cfg.DATASETS.SHAPENET.N_POINTS
                 },
                 'objects': ['partial_cloud']
-            }, {
+            }, 
+            {
                 'callback':
                 'RandomMirrorPoints',
                 'objects': ['partial_cloud', 'gtcloud']
-            }, {
+            }, 
+            {
                 'callback':
                 'ToTensor',
                 'objects': ['partial_cloud', 'gtcloud']
             }])
         else:
-            return utils.data_transforms.Compose([{
+            return utils.data_transforms.Compose([
+            {
                 'callback': 'UpSamplePoints',
                 'parameters': {
                     'n_points': cfg.DATASETS.SHAPENET.N_POINTS
                 },
                 'objects': ['partial_cloud']
-            }, {
+            }, 
+            {
                 'callback':
                 'ToTensor',
                 'objects': ['partial_cloud', 'gtcloud']
@@ -187,7 +233,7 @@ class ShapeNetDataLoader(object):
                         'model_id':
                         s,
                         'partial_cloud_path':
-                        gt_path.replace('complete', 'partial'),
+                        gt_path.replace('complete', 'partial').replace('.pcd', '/00.pcd'),
                         'gtcloud_path':
                         gt_path
                     })
@@ -224,6 +270,20 @@ class ShapeNetCarsDataLoader(ShapeNetDataLoader):
         self.dataset_categories = [
             dc for dc in self.dataset_categories
             if dc['taxonomy_id'] == '02958343'
+        ]
+
+
+class BracketsDataLoader(ShapeNetDataLoader):
+    """
+    ShapeNet only on bracket category
+    """
+    def __init__(self, cfg):
+        super(BracketsDataLoader, self).__init__(cfg)
+
+        # Remove other categories except cars
+        self.dataset_categories = [
+            dc for dc in self.dataset_categories
+            if dc['taxonomy_id'] == '00000000'
         ]
 
 
@@ -531,4 +591,5 @@ DATASET_LOADER_MAPPING = {
     'ShapeNetCars': ShapeNetCarsDataLoader,
     'KITTI': KittiDataLoader,
     'ShapeNet55': ShapeNet55DataLoader,
+    'Brackets': BracketsDataLoader,
 }  # yapf: disable

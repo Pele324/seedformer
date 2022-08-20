@@ -35,6 +35,7 @@ from utils.loss_utils import get_loss
 from utils.ply import read_ply, write_ply
 import pointnet_utils.pc_util as pc_util
 from PIL import Image
+from tqdm import tqdm
 
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -102,7 +103,7 @@ class Manager:
 
     def unpack_data(self, data):
 
-        if self.dataset == 'ShapeNet':
+        if self.dataset == 'ShapeNet' or self.dataset == 'ShapeNetCars' or self.dataset == 'Brackets':
             partial = data['partial_cloud']
             gt = data['gtcloud']
         elif self.dataset == 'ShapeNet55':
@@ -128,7 +129,7 @@ class Manager:
         self.test_record('#epoch cdc cd1 cd2 partial_matching | cd3 | #best_epoch best_metrics')
 
         # Training Start
-        for epoch_idx in range(init_epoch + 1, cfg.TRAIN.N_EPOCHS + 1):
+        for epoch_idx in tqdm(range(init_epoch + 1, cfg.TRAIN.N_EPOCHS + 1), desc="epoch"):
 
             self.epoch = epoch_idx
 
@@ -150,7 +151,7 @@ class Manager:
             batch_end_time = time.time()
             n_batches = len(train_data_loader)
             learning_rate = self.optimizer.param_groups[0]['lr']
-            for batch_idx, (taxonomy_ids, model_ids, data) in enumerate(train_data_loader):
+            for batch_idx, (taxonomy_ids, model_ids, data) in enumerate(tqdm(train_data_loader, desc="data_loader")):
                 for k, v in data.items():
                     data[k] = utils.helpers.var_or_cuda(v)
 
@@ -265,7 +266,7 @@ class Manager:
 
     def test(self, cfg, model, test_data_loader, outdir, mode=None):
 
-        if self.dataset == 'ShapeNet':
+        if self.dataset == 'ShapeNet' or self.dataset == 'ShapeNetCars' or self.dataset == 'Brackets':
             self.test_pcn(cfg, model, test_data_loader, outdir)
         elif self.dataset == 'ShapeNet55':
             self.test_shapenet55(cfg, model, test_data_loader, outdir, mode)
@@ -290,7 +291,7 @@ class Manager:
         category_metrics = dict()
 
         # Start testing
-        for model_idx, (taxonomy_id, model_id, data) in enumerate(test_data_loader):
+        for model_idx, (taxonomy_id, model_id, data, centroid, ratio) in enumerate(tqdm(test_data_loader)):
             taxonomy_id = taxonomy_id[0] if isinstance(taxonomy_id[0], str) else taxonomy_id[0].item()
             #model_id = model_id[0]
 

@@ -63,26 +63,26 @@ def PCNConfig():
     __C.DATASETS.COMPLETION3D.PARTIAL_POINTS_PATH    = '/path/to/datasets/Completion3D/%s/partial/%s/%s.h5'
     __C.DATASETS.COMPLETION3D.COMPLETE_POINTS_PATH   = '/path/to/datasets/Completion3D/%s/gt/%s/%s.h5'
     __C.DATASETS.SHAPENET                            = edict()
-    __C.DATASETS.SHAPENET.CATEGORY_FILE_PATH         = './datasets/ShapeNet.json'
-    __C.DATASETS.SHAPENET.N_RENDERINGS               = 8
+    __C.DATASETS.SHAPENET.CATEGORY_FILE_PATH         = './datasets/Brackets.json'
+    __C.DATASETS.SHAPENET.N_RENDERINGS               = 1
     __C.DATASETS.SHAPENET.N_POINTS                   = 2048
-    __C.DATASETS.SHAPENET.PARTIAL_POINTS_PATH        = '<*PATH-TO-YOUR-DATASET*>/PCN/%s/partial/%s/%s/%02d.pcd'
-    __C.DATASETS.SHAPENET.COMPLETE_POINTS_PATH       = '<*PATH-TO-YOUR-DATASET*>/PCN/%s/complete/%s/%s.pcd'
+    __C.DATASETS.SHAPENET.PARTIAL_POINTS_PATH        = 'datasets/Brackets/%s/partial/%s/%s/%02d.pcd'
+    __C.DATASETS.SHAPENET.COMPLETE_POINTS_PATH       = 'datasets/Brackets/%s/complete/%s/%s.pcd'
 
     #
     # Dataset
     #
     __C.DATASET                                      = edict()
-    # Dataset Options: Completion3D, ShapeNet, ShapeNetCars, Completion3DPCCT
-    __C.DATASET.TRAIN_DATASET                        = 'ShapeNet'
-    __C.DATASET.TEST_DATASET                         = 'ShapeNet'
+    # Dataset Options: Completion3D, ShapeNet, ShapeNetCars, Completion3DPCCT, Brackets
+    __C.DATASET.TRAIN_DATASET                        = 'Brackets'
+    __C.DATASET.TEST_DATASET                         = 'Brackets'
 
     #
     # Constants
     #
     __C.CONST                                        = edict()
 
-    __C.CONST.NUM_WORKERS                            = 8
+    __C.CONST.NUM_WORKERS                            = 1
     __C.CONST.N_INPUT_POINTS                         = 2048
 
     #
@@ -90,8 +90,8 @@ def PCNConfig():
     #
 
     __C.DIR                                          = edict()
-    __C.DIR.OUT_PATH                                 = '../results'
-    __C.DIR.TEST_PATH                                = '../test'
+    __C.DIR.OUT_PATH                                 = './results'
+    __C.DIR.TEST_PATH                                = './test'
     __C.CONST.DEVICE                                 = '0, 1'
     # __C.CONST.WEIGHTS                                = None # 'ckpt-best.pth'  # specify a path to run test and inference
 
@@ -105,7 +105,7 @@ def PCNConfig():
     # Train
     #
     __C.TRAIN                                        = edict()
-    __C.TRAIN.BATCH_SIZE                             = 48
+    __C.TRAIN.BATCH_SIZE                             = 8
     __C.TRAIN.N_EPOCHS                               = 400
     __C.TRAIN.SAVE_FREQ                              = 25
     __C.TRAIN.LEARNING_RATE                          = 0.001
